@@ -1,4 +1,4 @@
-package src.main.java;
+package br.com.meslin;
 
 import javax.websocket.OnClose;
 import javax.websocket.OnMessage;
@@ -12,15 +12,15 @@ import org.glassfish.tyrus.server.Server;
 
 import java.util.Date;
 
-@ServerEndpoint("/ws")
+@ServerEndpoint(value = "/ws")
 public class WebSocketServer {
-    private static ChatProducer chatProducer;
+
     private Session session;
     private static final Set<WebSocketServer> connections = new CopyOnWriteArraySet<>();
     private static Server server;
 
-    public static void startServer(ChatProducer producer) {
-        chatProducer = producer;
+    public static void startServer() {
+
         server = new Server("localhost", 8080, "/chat", null, WebSocketServer.class);
 
         try {
@@ -42,7 +42,7 @@ public class WebSocketServer {
 
     @OnMessage
     public void onMessage(String message) {
-        chatProducer.sendMessage(message);
+        
         broadcast(message);
     }
 
@@ -55,7 +55,7 @@ public class WebSocketServer {
         for (WebSocketServer client : connections) {
             try {
                 synchronized (client) {
-                    client.session.getBasicRemote().sendText(new Date() + " --> " + message);
+                    client.session.getBasicRemote().sendText(message);
                 }
             } catch (IOException e) {
                 connections.remove(client);

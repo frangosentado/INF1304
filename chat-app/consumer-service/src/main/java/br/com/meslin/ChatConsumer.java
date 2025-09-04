@@ -1,4 +1,4 @@
-package src.main.java;
+package br.com.meslin;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;

@@ -1,4 +1,4 @@
-package src.main.java;
+package br.com.meslin;
 
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -10,8 +10,6 @@ import java.util.Date;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import src.main.java.WebSocketServer;
 
 public class ChatProducer {
     private final KafkaProducer<String, String> producer;
@@ -41,16 +39,16 @@ public class ChatProducer {
     }
     
     public static void main(String[] args) {
-        logger.info("Starting Chat Producer.");
+        logger.info("[ChatProducer.main] Starting Chat Producer.");
         ChatProducer chatProducer = new ChatProducer("chat-messages");
         WebSocketServer.startServer(chatProducer);
 
         // Keep the application running
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            logger.info("Shutting down...");
+            logger.info("[ChatProducer.main] Shutting down...");
             WebSocketServer.stopServer();
             chatProducer.close();
-            logger.info("Shutdown complete.");
+            logger.info("[ChatProducer.main] Shutdown complete.");
         }));
 
         try {
