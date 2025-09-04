@@ -1,0 +1,231 @@
+# Tentativa de usar várias redes separadas
+# Não funcionou porque os containers não conseguem resolver os nomes
+# Problema no DNS
+#version: '3'
+services:
+  kafka1:
+    # https://hub.docker.com/r/apache/kafka
+    # https://stackoverflow.com/questions/78807386/kafka-kraft-mode-with-docker-compose
+    container_name: kafka1
+    image: apache/kafka:4.0.0
+    ports:
+      - "9092:9092"
+      - "19092:19092" # Expose CONTROLLER port for host access
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:19092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://router:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # KAFKA_CONTROLLER_QUORUM_VOTERS: <node_id>@<hostname>:<port>
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@router:19092,2@router:19093,3@router:19094
+      KAFKA_LOG_DIRS: /var/lib/kafka/data/
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 2
+      KAFKA_MIN_INSYNC_REPLICAS: 1
+    volumes:
+      - kafka1_logs:/var/lib/kafka/data/
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+    networks:
+      - kafka1-network
+
+  kafka2:
+    container_name: kafka2
+    image: apache/kafka:4.0.0
+    ports:
+      - "9093:9093"
+      - "19093:19093" # Expose CONTROLLER port for host access
+    environment:
+      KAFKA_NODE_ID: 2
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9093,CONTROLLER://0.0.0.0:19093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://router:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@router:19092,2@router:19093,3@router:19094
+      KAFKA_LOG_DIRS: /var/lib/kafka/data/
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 2
+      KAFKA_MIN_INSYNC_REPLICAS: 1
+    volumes:
+      - kafka2_logs:/var/lib/kafka/data/
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+    networks:
+      - kafka2-network
+
+  kafka3:
+    container_name: kafka3
+    image: apache/kafka:4.0.0
+    ports:
+      - "9094:9094"
+      - "19094:19094" # Expose CONTROLLER port for host access
+    environment:
+      KAFKA_NODE_ID: 3
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9094,CONTROLLER://0.0.0.0:19094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://router:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@router:19092,2@router:19093,3@router:19094
+      KAFKA_LOG_DIRS: /var/lib/kafka/data/
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 2
+      KAFKA_MIN_INSYNC_REPLICAS: 1
+    volumes:
+      - kafka3_logs:/var/lib/kafka/data/
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+    networks:
+      - kafka3-network
+
+  producer-service0:
+    container_name: producer_service0
+    build: ./producer-service
+    ports:
+      - "8080:8080"
+    depends_on:
+      - kafka1
+      - kafka2
+      - kafka3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    environment:
+      KAFKA_BROKERS: router:9092,router:9093,router:9094
+    networks:
+      - ext-network
+
+  producer-service1:
+    container_name: producer_service1
+    build: ./producer-service
+    ports:
+      - "8180:8080"
+    depends_on:
+      - kafka1
+      - kafka2
+      - kafka3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    environment:
+      KAFKA_BROKERS: router:9092,router:9093,router:9094
+    networks:
+      - ext-network
+
+  consumer-service0:
+    container_name: consumer_service0
+    build: ./consumer-service
+    ports:
+      - "8081:8080"
+    depends_on:
+      - kafka1
+      - kafka2
+      - kafka3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    environment:
+      KAFKA_BROKERS: router:9092,router:9093,router:9094
+    networks:
+      - ext-network
+
+  consumer-service1:
+    container_name: consumer_service1
+    build: ./consumer-service
+    ports:
+      - "8181:8080"
+    depends_on:
+      - kafka1
+      - kafka2
+      - kafka3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    environment:
+      KAFKA_BROKERS: router:9092,router:9093,router:9094
+    networks:
+      - ext-network
+
+  frontend:
+    container_name: frontend1
+    image: python:3.9-slim
+    volumes:
+      - ./frontend:/app
+    working_dir: /app
+    command: python3 -m http.server --bind 0.0.0.0 8000
+    ports:
+      - "8000:8000"
+    networks:
+      - ext-network
+
+  router:
+    container_name: router
+    image: alpine
+    privileged: true
+    command: sh -c "
+      apk add --no-cache iptables iproute2 &&
+      sysctl -w net.ipv4.ip_forward=1 &&
+      iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE &&
+      iptables -A FORWARD -i eth0 -o eth1 -m state --state NEW,RELATED,ESTABLISHED -j ACCEPT &&
+      iptables -A FORWARD -i eth0 -o eth2 -m state --state NEW,RELATED,ESTABLISHED -j ACCEPT &&
+      iptables -A FORWARD -i eth0 -o eth3 -m state --state NEW,RELATED,ESTABLISHED -j ACCEPT &&
+      iptables -A FORWARD -i eth1 -o eth0 -m state --state RELATED,ESTABLISHED -j ACCEPT &&
+      iptables -A FORWARD -i eth2 -o eth0 -m state --state RELATED,ESTABLISHED -j ACCEPT &&
+      iptables -A FORWARD -i eth3 -o eth0 -m state --state RELATED,ESTABLISHED -j ACCEPT &&
+      tail -f /dev/null"
+    cap_add:
+      - NET_ADMIN
+    networks:
+      - kafka1-network
+      - kafka2-network
+      - kafka3-network
+      - ext-network
+
+networks:
+  ext-network:
+    driver: bridge
+  kafka1-network:
+    driver: bridge
+    internal: true
+  kafka2-network:
+    driver: bridge
+    internal: true
+  kafka3-network:
+    driver: bridge
+    internal: true
+
+volumes:
+  # /var/lib/docker/volumes
+  kafka1_logs:
+  kafka2_logs:
+  kafka3_logs:
